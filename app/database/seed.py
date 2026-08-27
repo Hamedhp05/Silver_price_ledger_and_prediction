@@ -1,11 +1,11 @@
-# import logging
+import logging
 from sqlalchemy.orm import Session
 from app.database.session import SessionLocal
 from app.models.sources import SourceModel
 from app.models.sources import SourceType
 
 
-# logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 sources = [
@@ -40,13 +40,13 @@ def seed_sources():
 
         db.commit()
 
-        # logger.info("Sources seeded successfully.")
+        logger.info("Sources seeded successfully.")
 
         return "Sources set successfully"
 
     except Exception:
         db.rollback()
-        # logger.exception("Failed to seed sources.")
+        logger.exception("Failed to seed sources.")
         raise
 
     finally:
