@@ -7,6 +7,9 @@ from app.database.seed import seed_sources
 from app.scheduler.scheduler import start_scheduler
 from app.scheduler.scheduler import stop_scheduler
 
+from app.api.price_api import router as price_router
+from app.api.manual_collector_api import router as collector_router
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -24,3 +27,6 @@ app = FastAPI(
     title="Silver Price Ledger System",
     lifespan=lifespan,
 )
+
+app.include_router(price_router)
+app.include_router(collector_router)

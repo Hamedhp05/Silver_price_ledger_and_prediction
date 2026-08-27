@@ -3,18 +3,15 @@ from sqlalchemy.orm import Session
 from app.models.silver_price import PriceModel
 from app.models.sources import SourceModel
 
+
 SOURCES = ("tgju", "silfam", "noghresea")
 
 
 def get_latest_prices(db: Session):
-    """
-    Get the latest price of each source.
-    """
-
     latest_prices = {}
 
     for source_name in SOURCES:
-        price = (
+        result = (
             db.query(
                 PriceModel.price,
                 SourceModel.name.label("source"),
@@ -29,7 +26,15 @@ def get_latest_prices(db: Session):
             .first()
         )
 
-        latest_prices[source_name] = price
+        if result is None:
+            latest_prices[source_name] = None
+            continue
+
+        latest_prices[source_name] = {
+            "price": int(result.price),
+            "source": result.source,
+            "timestamp": result.timestamp,
+        }
 
     return latest_prices
 
@@ -78,12 +83,7 @@ def get_chart_data(
     source: str,
     point_count: int = 50,
 ):
-    """
-    Get the latest N price points for a specific source,
-    ordered from oldest to newest.
-    """
-
-    return (
+    prices = (
         db.query(PriceModel)
         .join(
             SourceModel,
@@ -93,5 +93,6 @@ def get_chart_data(
         .order_by(PriceModel.fetched_at.desc())
         .limit(point_count)
         .all()
-    )[::-1]
+    )
 
+    return prices[::-1]
