@@ -1,0 +1,10 @@
+fastapi[all]==0.141.1
+alembic==1.18.5
+psycopg2-binary==2.9.12
+requests==2.34.2
+beautifulsoup4==4.15.0
+jdatetime==6.1.0
+APScheduler==3.11.3
+scikit-learn==1.9.0
+pandas==3.0.5
+pytest==9.1.1
