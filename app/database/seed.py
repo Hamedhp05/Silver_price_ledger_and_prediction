@@ -52,4 +52,3 @@ def seed_sources():
     finally:
         db.close()
 
-seed_sources()
