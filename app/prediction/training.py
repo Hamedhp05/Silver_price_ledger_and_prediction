@@ -15,10 +15,11 @@ from app.prediction.features import prepare_features
 
 logger = logging.getLogger(__name__)
 
-MODEL_DIR = Path(__file__).resolve().parents[2] / "ml_models"
 
+MODEL_DIR = Path(__file__).resolve().parents[2] / "ml_models"
 LINEAR_MODEL_PATH = MODEL_DIR / "linear_regression.pkl"
 RANDOM_FOREST_MODEL_PATH = MODEL_DIR / "random_forest.pkl"
+
 
 
 def get_price_data(db: Session) -> pd.DataFrame:
@@ -26,28 +27,48 @@ def get_price_data(db: Session) -> pd.DataFrame:
         db.query(
             PriceModel.price,
             PriceModel.fetched_at,
+            PriceModel.created_at,
             SourceModel.name.label("source"),
         )
-        .join(SourceModel)
+        .join(
+            SourceModel,
+            PriceModel.source_id == SourceModel.id,
+        )
         .filter(
             SourceModel.name.in_(
                 ["tgju", "silfam", "noghresea"]
             )
         )
-        .order_by(PriceModel.fetched_at.asc())
+        .order_by(
+            PriceModel.fetched_at.asc()
+        )
         .all()
     )
 
     if not data:
-        raise ValueError("No price data available.")
+        raise ValueError(
+            "No price data available."
+        )
 
     df = pd.DataFrame(
         data,
-        columns=["price", "fetched_at", "source"],
+        columns=[
+            "price",
+            "fetched_at",
+            "created_at",
+            "source",
+        ],
     )
 
     df["price"] = df["price"].astype(float)
-    df["fetched_at"] = pd.to_datetime(df["fetched_at"])
+
+    df["fetched_at"] = pd.to_datetime(
+        df["fetched_at"]
+    )
+
+    df["created_at"] = pd.to_datetime(
+        df["created_at"]
+    )
 
     return df
 
@@ -55,8 +76,15 @@ def get_price_data(db: Session) -> pd.DataFrame:
 def evaluate_model(model, X_test, y_test):
     predictions = model.predict(X_test)
 
-    mae = mean_absolute_error(y_test, predictions)
-    rmse = mean_squared_error(y_test, predictions) ** 0.5
+    mae = mean_absolute_error(
+        y_test,
+        predictions,
+    )
+
+    rmse = mean_squared_error(
+        y_test,
+        predictions,
+    ) ** 0.5
 
     return mae, rmse
 
@@ -110,7 +138,10 @@ def train_models(db: Session):
             rmse,
         )
 
-    MODEL_DIR.mkdir(parents=True, exist_ok=True)
+    MODEL_DIR.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
     joblib.dump(
         results["LinearRegression"]["model"],

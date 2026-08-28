@@ -21,22 +21,27 @@ def prepare_features(df: pd.DataFrame) -> pd.DataFrame:
 
     for source in SOURCE_NAMES:
         sources[source] = (
-            df[df["source"] == source][["created_at", "price"]]
+            df[df["source"] == source][["created_at", "fetched_at", "price"]]
             .rename(columns={"price": source})
             .sort_values("created_at")
         )
 
     data = sources["tgju"]
+
     for source in ["silfam", "noghresea"]:
+        source_data = sources[source][["created_at", source]]
+
         data = pd.merge_asof(
             data,
-            sources[source],
+            source_data,
             on="created_at",
             direction="nearest",
             tolerance=MERGE_TOLERANCE,
         )
 
     data = data.dropna(subset=SOURCE_NAMES)
+
+    data = data.sort_values("fetched_at")
 
     data["silver_price"] = data[SOURCE_NAMES].mean(axis=1)
 
