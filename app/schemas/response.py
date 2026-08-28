@@ -23,7 +23,12 @@ class HistoricalDataResponseSchema(BaseModel):
     created_at: datetime
 
 
-class PredictionResponseSchema(BaseModel):
-    predicted_price: float
+class PredictionResultSchema(BaseModel):
+    predicted_price: int
     model: str
     predicted_at: datetime
+
+
+class PredictionResponseSchema(BaseModel):
+    linear_regression: PredictionResultSchema
+    random_forest: PredictionResultSchema

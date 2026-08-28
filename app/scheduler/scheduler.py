@@ -27,7 +27,7 @@ def start_scheduler():
     scheduler.add_job(
         run_collection_job,
         "interval",
-        hours=1,
+        minutes=20,
         id="collect_silver_prices",
         replace_existing=True,
         max_instances=1,

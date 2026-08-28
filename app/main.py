@@ -9,6 +9,7 @@ from app.scheduler.scheduler import stop_scheduler
 
 from app.api.price_api import router as price_router
 from app.api.manual_collector_api import router as collector_router
+from app.api.prediction_api import router as prediction_router
 
 
 @asynccontextmanager
@@ -30,3 +31,4 @@ app = FastAPI(
 
 app.include_router(price_router)
 app.include_router(collector_router)
+app.include_router(prediction_router)
