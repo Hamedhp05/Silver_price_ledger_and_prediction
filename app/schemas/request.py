@@ -23,3 +23,7 @@ class HistoricalRequestSchema(BaseModel):
 class ChartRequestSchema(BaseModel):
     source: SourceEnum
     point_count: int = Field(default=50, ge=1)
+
+class UserLoginRequestSchema(BaseModel):
+    username: str = Field(..., min_length=3, max_length=100)
+    password: str = Field(..., min_length=6)

@@ -30,8 +30,7 @@ def start_scheduler():
         minutes=20,
         id="collect_silver_prices",
         replace_existing=True,
-        max_instances=1,
-        next_run_time=datetime.now()    # First record colecting at starting scheduler
+        max_instances=1
     )
 
     scheduler.start()

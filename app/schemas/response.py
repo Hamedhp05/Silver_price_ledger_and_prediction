@@ -32,3 +32,7 @@ class PredictionResultSchema(BaseModel):
 class PredictionResponseSchema(BaseModel):
     linear_regression: PredictionResultSchema
     random_forest: PredictionResultSchema
+
+class TokenResponseSchema(BaseModel):
+    access_token: str
+    token_type: str

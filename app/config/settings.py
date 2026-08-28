@@ -7,6 +7,9 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str
     POSTGRES_DB: str
 
+    JWT_SECRET_KEY: str
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8"
@@ -14,3 +17,6 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+
