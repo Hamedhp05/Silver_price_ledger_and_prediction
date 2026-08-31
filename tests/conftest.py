@@ -1,13 +1,16 @@
 import os
+
 import pytest
 from dotenv import load_dotenv
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from app.main import app
+
 from app.database.base import Base
 from app.database.session import get_db
-from app.models.sources import SourceModel
+from app.api.price_api import router as price_router
+from app.api.prediction_api import router as prediction_router
 
 
 load_dotenv(".env.test")
@@ -22,7 +25,11 @@ TestSessionLocal = sessionmaker(
     bind=engine,
 )
 
-test_client = TestClient(app)
+
+test_app = FastAPI()
+
+test_app.include_router(price_router)
+test_app.include_router(prediction_router)
 
 
 @pytest.fixture
@@ -40,34 +47,9 @@ def db_session():
 
 @pytest.fixture
 def client(db_session):
-    app.dependency_overrides[get_db] = lambda: db_session
+    test_app.dependency_overrides[get_db] = lambda: db_session
 
-    yield test_client
+    with TestClient(test_app) as test_client:
+        yield test_client
 
-    app.dependency_overrides.pop(get_db, None)
-
-
-@pytest.fixture
-def seed_sources(db_session):
-    sources = [
-        SourceModel(
-            name="tgju",
-            type="API",
-            enabled=True,
-        ),
-        SourceModel(
-            name="silfam",
-            type="Scraper",
-            enabled=True,
-        ),
-        SourceModel(
-            name="noghresea",
-            type="Scraper",
-            enabled=True,
-        ),
-    ]
-
-    db_session.add_all(sources)
-    db_session.commit()
-
-    return sources
+    test_app.dependency_overrides.pop(get_db, None)

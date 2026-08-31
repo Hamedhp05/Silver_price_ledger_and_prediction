@@ -1,90 +1,299 @@
 from datetime import datetime
 
+import pandas as pd
+
 from app.models.prediction import PredictionModel
+from app.services.prediction_service import (
+    get_price_data,
+    predict,
+    predict_linear_regression,
+    predict_random_forest,
+)
 
 
-def test_prediction_api(client, monkeypatch):
+from app.models.silver_price import PriceModel
+from app.models.sources import SourceModel
+from app.services.prediction_service import get_price_data
 
-    def fake_linear(db):
-        return {
-            "predicted_price": 250000,
-            "model": "LinearRegression",
-            "predicted_at": datetime(
-                2026, 8, 28, 18, 0
-            ),
-        }
 
-    def fake_forest(db):
-        return {
-            "predicted_price": 255000,
-            "model": "RandomForestRegressor",
-            "predicted_at": datetime(
-                2026, 8, 28, 18, 0
-            ),
-        }
 
-    monkeypatch.setattr(
-        "app.api.prediction_api.predict_linear_regression",
-        fake_linear,
+
+def test_get_price_data(db_session, seed_sources):
+    from app.models.silver_price import PriceModel
+
+    tgju = seed_sources[0]
+    silfam = seed_sources[1]
+    noghresea = seed_sources[2]
+
+    db_session.add_all([
+        PriceModel(
+            source_id=tgju.id,
+            price=470000,
+            fetched_at=datetime(2026, 8, 30, 18, 0),
+        ),
+        PriceModel(
+            source_id=silfam.id,
+            price=440000,
+            fetched_at=datetime(2026, 8, 30, 18, 0, 5),
+        ),
+        PriceModel(
+            source_id=noghresea.id,
+            price=450000,
+            fetched_at=datetime(2026, 8, 30, 18, 0, 10),
+        ),
+    ])
+
+    db_session.commit()
+
+    result = get_price_data(db_session)
+
+    assert isinstance(result, pd.DataFrame)
+    assert len(result) == 3
+
+    assert set(result["source"]) == {
+        "tgju",
+        "silfam",
+        "noghresea",
+    }
+
+    assert list(result["fetched_at"]) == sorted(
+        result["fetched_at"]
     )
 
-    monkeypatch.setattr(
-        "app.api.prediction_api.predict_random_forest",
-        fake_forest,
-    )
 
-    response = client.get("/prediction/predict")
+def test_get_price_data_rejects_empty_database(db_session):
+    import pytest
 
-    assert response.status_code == 200
-
-    data = response.json()
-
-    assert data["linear_regression"]["predicted_price"] == 250000
-    assert data["random_forest"]["predicted_price"] == 255000
+    with pytest.raises(ValueError, match="No price data available"):
+        get_price_data(db_session)
 
 
-def test_prediction_saved_in_database(
+def test_predict_saves_prediction(
     db_session,
-    client,
     monkeypatch,
+    tmp_path,
 ):
-    def fake_linear(db):
-        prediction = PredictionModel(
-            predicted_price=250000,
-            model="LinearRegression",
-        )
-        db.add(prediction)
-        db.commit()
-        db.refresh(prediction)
-        return prediction
+    class FakeModel:
+        def predict(self, features):
+            return [255000]
 
-    def fake_forest(db):
-        prediction = PredictionModel(
-            predicted_price=255000,
-            model="RandomForestRegressor",
-        )
-        db.add(prediction)
-        db.commit()
-        db.refresh(prediction)
-        return prediction
+    model_path = tmp_path / "model.joblib"
+    model_path.touch()
 
     monkeypatch.setattr(
-        "app.api.prediction_api.predict_linear_regression",
-        fake_linear,
+        "app.services.prediction_service.joblib.load",
+        lambda path: FakeModel(),
+    )
+
+    def fake_get_price_data(db):
+        return pd.DataFrame([
+            {
+                "price": 470000,
+                "fetched_at": datetime(2026, 8, 30, 18, 0),
+                "created_at": datetime(2026, 8, 30, 18, 0),
+                "source": "tgju",
+            }
+        ])
+
+    def fake_prepare_features(df):
+        return pd.DataFrame([
+            {
+                "tgju": 470000,
+                "silfam": 440000,
+                "noghresea": 450000,
+                "lag_1": 455000,
+                "lag_2": 454000,
+                "lag_3": 453000,
+                "ma_3": 454000,
+                "ma_5": 454000,
+                "price_change": 0.01,
+                "next_price": 456000,
+            }
+        ])
+
+    monkeypatch.setattr(
+        "app.services.prediction_service.get_price_data",
+        fake_get_price_data,
     )
 
     monkeypatch.setattr(
-        "app.api.prediction_api.predict_random_forest",
-        fake_forest,
+        "app.services.prediction_service.prepare_features",
+        fake_prepare_features,
     )
 
-    response = client.get("/prediction/predict")
+def test_get_price_data(db_session):
+    sources = [
+        SourceModel(
+            name="tgju",
+            type="API",
+            enabled=True,
+        ),
+        SourceModel(
+            name="silfam",
+            type="SCRAPER",
+            enabled=True,
+        ),
+        SourceModel(
+            name="noghresea",
+            type="SCRAPER",
+            enabled=True,
+        ),
+    ]
 
-    assert response.status_code == 200
+    db_session.add_all(sources)
+    db_session.commit()
 
-    predictions = (
-        db_session.query(PredictionModel)
+    prices = [
+        PriceModel(
+            source_id=sources[0].id,
+            price=407430,
+            fetched_at=pd.Timestamp(
+                "2026-08-30 18:00:00"
+            ),
+        ),
+        PriceModel(
+            source_id=sources[1].id,
+            price=440000,
+            fetched_at=pd.Timestamp(
+                "2026-08-30 18:00:05"
+            ),
+        ),
+        PriceModel(
+            source_id=sources[2].id,
+            price=450000,
+            fetched_at=pd.Timestamp(
+                "2026-08-30 18:00:10"
+            ),
+        ),
+    ]
+
+    db_session.add_all(prices)
+    db_session.commit()
+
+    result = get_price_data(db_session)
+
+    assert isinstance(result, pd.DataFrame)
+    assert len(result) == 3
+
+    assert set(result["source"]) == {
+        "tgju",
+        "silfam",
+        "noghresea",
+    }
+
+    assert "price" in result.columns
+    assert "fetched_at" in result.columns
+    assert "created_at" in result.columns
+
+    assert pd.api.types.is_float_dtype(
+        result["price"]
+    )
+
+    assert pd.api.types.is_datetime64_any_dtype(
+        result["fetched_at"]
+    )
+
+    assert pd.api.types.is_datetime64_any_dtype(
+        result["created_at"]
+    )
+
+
+def test_get_price_data_raises_when_database_is_empty(
+    db_session,
+):
+    from app.services.prediction_service import get_price_data
+
+    try:
+        get_price_data(db_session)
+        assert False
+    except ValueError as exc:
+        assert str(exc) == "No price data available."
+    result = predict(
+        db_session,
+        model_path,
+        "TestModel",
+    )
+
+    assert result.predicted_price == 255000
+    assert result.model == "TestModel"
+    assert result.predicted_at is not None
+
+    saved = (
+        db_session
+        .query(PredictionModel)
         .all()
     )
 
-    assert len(predictions) == 2
+    assert len(saved) == 1
+    assert saved[0].predicted_price == 255000
+    assert saved[0].model == "TestModel"
+
+
+def test_predict_rejects_missing_model(
+    db_session,
+    tmp_path,
+):
+    import pytest
+
+    missing_path = (
+        tmp_path / "missing_model.joblib"
+    )
+
+    with pytest.raises(
+        FileNotFoundError,
+        match="Model file not found",
+    ):
+        predict(
+            db_session,
+            missing_path,
+            "TestModel",
+        )
+
+
+def test_linear_regression_uses_correct_model(
+    db_session,
+    monkeypatch,
+):
+    called = {}
+
+    def fake_predict(db, model_path, model_name):
+        called["path"] = model_path
+        called["name"] = model_name
+
+        return "linear-result"
+
+    monkeypatch.setattr(
+        "app.services.prediction_service.predict",
+        fake_predict,
+    )
+
+    result = predict_linear_regression(
+        db_session
+    )
+
+    assert result == "linear-result"
+    assert called["name"] == "LinearRegression"
+
+
+def test_random_forest_uses_correct_model(db_session,
+    monkeypatch,
+):
+    called = {}
+
+    def fake_predict(db, model_path, model_name):
+        called["path"] = model_path
+        called["name"] = model_name
+
+        return "forest-result"
+
+    monkeypatch.setattr(
+        "app.services.prediction_service.predict",
+        fake_predict,
+    )
+
+    result = predict_random_forest(
+        db_session
+    )
+
+    assert result == "forest-result"
+    assert called["name"] == "RandomForestRegressor"
