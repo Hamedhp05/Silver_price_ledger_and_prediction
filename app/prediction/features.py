@@ -1,59 +1,26 @@
 import pandas as pd
 
+FEATURES = ["lag_1", "lag_2", "lag_3", "ma_3", "ma_5", "price_change"]
 
-SOURCE_NAMES = ["tgju", "silfam", "noghresea"]
-MERGE_TOLERANCE = pd.Timedelta(seconds=50)
-FEATURES = [
-    "tgju",
-    "silfam",
-    "noghresea",
-    "lag_1",
-    "lag_2",
-    "lag_3",
-    "ma_3",
-    "ma_5",
-    "price_change",
-]
+def add_lag(df: pd.Series, window: int) -> pd.Series:
+    return df.shift(window)
 
+def add_moving_average(df: pd.Series, window: int) -> pd.Series:
+    return df.rolling(window).mean()
+
+def add_price_change(df: pd.Series) -> pd.Series:
+    return df.pct_change()
 
 def prepare_features(df: pd.DataFrame) -> pd.DataFrame:
-    sources = {}
+    df = df.sort_values("fetched_at").copy()
 
-    for source in SOURCE_NAMES:
-        sources[source] = (
-            df[df["source"] == source][["created_at", "fetched_at", "price"]]
-            .rename(columns={"price": source})
-            .sort_values("created_at")
-        )
+    df["lag_1"] = add_lag(df["price"], 1)
+    df["lag_2"] = add_lag(df["price"], 2)
+    df["lag_3"] = add_lag(df["price"], 3)
+    df["ma_3"] = add_moving_average(df["price"], 3)
+    df["ma_5"] = add_moving_average(df["price"], 5)
+    df["price_change"] = add_price_change(df["price"])
+    df["next_price"] = add_lag(df["price"], -1)
 
-    data = sources["tgju"]
+    return df.dropna()
 
-    for source in ["silfam", "noghresea"]:
-        source_data = sources[source][["created_at", source]]
-
-        data = pd.merge_asof(
-            data,
-            source_data,
-            on="created_at",
-            direction="nearest",
-            tolerance=MERGE_TOLERANCE,
-        )
-
-    data = data.dropna(subset=SOURCE_NAMES)
-
-    data = data.sort_values("fetched_at")
-
-    data["silver_price"] = data[SOURCE_NAMES].mean(axis=1)
-
-    data["lag_1"] = data["silver_price"].shift(1)
-    data["lag_2"] = data["silver_price"].shift(2)
-    data["lag_3"] = data["silver_price"].shift(3)
-
-    data["ma_3"] = data["silver_price"].rolling(3).mean()
-    data["ma_5"] = data["silver_price"].rolling(5).mean()
-
-    data["price_change"] = data["silver_price"].pct_change()
-
-    data["next_price"] = data["silver_price"].shift(-1)
-
-    return data.dropna()

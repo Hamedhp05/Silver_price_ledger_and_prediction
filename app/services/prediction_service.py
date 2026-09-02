@@ -3,124 +3,80 @@ import joblib
 import pandas as pd
 from sqlalchemy.orm import Session
 from app.models.prediction import PredictionModel
-from app.models.silver_price import PriceModel
-from app.models.sources import SourceModel
+from app.prediction.data_loader import load_price_data
 from app.prediction.features import FEATURES
-from app.prediction.features import prepare_features
-from app.prediction.training import LINEAR_MODEL_PATH
-from app.prediction.training import RANDOM_FOREST_MODEL_PATH
+from app.prediction.training import MODEL_DIR
+from app.prediction.features import add_lag
+from app.prediction.features import add_price_change
+from app.prediction.features import add_moving_average
 
 
 logger = logging.getLogger(__name__)
 
+SOURCES = ("tgju", "silfam", "noghresea")
 
-def get_price_data(db: Session) -> pd.DataFrame:
-    data = (
-        db.query(
-            PriceModel.price,
-            PriceModel.fetched_at,
-            PriceModel.created_at,
-            SourceModel.name.label("source"),
-        )
-        .join(
-            SourceModel,
-            PriceModel.source_id == SourceModel.id,
-        )
-        .filter(
-            SourceModel.name.in_(
-                ["tgju", "silfam", "noghresea"]
+
+
+def prepare_prediction_features(db: Session, source: str) -> pd.DataFrame:
+
+    data = load_price_data(db, source)
+    data = data.sort_values("fetched_at").copy()
+
+    data["lag_1"] = add_lag(data["price"], 1)
+    data["lag_2"] = add_lag(data["price"], 2)
+    data["lag_3"] = add_lag(data["price"], 3)
+    data["ma_3"] = add_moving_average(data["price"], 3)
+    data["ma_5"] = add_moving_average(data["price"], 5)
+    data["price_change"] = add_price_change(data["price"])
+
+    return data.iloc[-1:]
+
+def predict(db: Session,source: str,model_name: str):
+    try:
+        if source not in SOURCES:
+            raise ValueError(f"Unsupported source: {source}")
+
+        model_path = MODEL_DIR / f"{source}_{model_name}.pkl"
+
+        if not model_path.exists():
+            raise FileNotFoundError(
+                f"Model file not found: {model_path}"
             )
-        )
-        .order_by(
-            PriceModel.fetched_at.asc()
-        )
-        .all()
-    )
 
-    if not data:
-        raise ValueError(
-            "No price data available."
-        )
+        latest = prepare_prediction_features(db , source)
+        features = latest[FEATURES]
 
-    df = pd.DataFrame(
-        data,
-        columns=[
-            "price",
-            "fetched_at",
-            "created_at",
-            "source",
-        ],
-    )
+        model = joblib.load(model_path)
+        predicted_price = int(round(model.predict(features)[0]))
 
-    df["price"] = df["price"].astype(float)
+        prediction = PredictionModel(predicted_price=predicted_price,model=f"{source}_{model_name}")
 
-    df["fetched_at"] = pd.to_datetime(
-        df["fetched_at"]
-    )
+        db.add(prediction)
+        db.commit()
+        db.refresh(prediction)
 
-    df["created_at"] = pd.to_datetime(
-        df["created_at"]
-    )
-
-    return df
-
-
-def predict(
-    db: Session,
-    model_path,
-    model_name: str,
-):
-    if not model_path.exists():
-        raise FileNotFoundError(
-            f"Model file not found: {model_path}"
+        logger.info(
+            "Prediction created for %s using %s.",
+            source,
+            model_name,
         )
 
-    model = joblib.load(model_path)
+        return prediction
 
-    df = get_price_data(db)
-    data = prepare_features(df)
-
-    latest = data.iloc[-1]
-
-    features = pd.DataFrame(
-        [[latest[feature] for feature in FEATURES]],
-        columns=FEATURES,
-    )
-
-    predicted_price = int(
-        round(model.predict(features)[0])
-    )
-
-    prediction = PredictionModel(
-        predicted_price=predicted_price,
-        model=model_name,
-    )
-
-    db.add(prediction)
-    db.commit()
-    db.refresh(prediction)
-
-    logger.info(
-        "Prediction created using %s.",
-        model_name,
-    )
-
-    return prediction
+    except Exception:
+        db.rollback()
+        logger.exception(
+            "Prediction failed for %s using %s.",
+            source,
+            model_name
+        )
+        raise
 
 
-def predict_linear_regression(db: Session):
-    return predict(
-        db,
-        LINEAR_MODEL_PATH,
-        "LinearRegression",
-    )
+def predict_linear_regression(db: Session, source: str):
+    return predict(db,source,"LinearRegression")
 
 
-def predict_random_forest(db: Session):
-    return predict(
-        db,
-        RANDOM_FOREST_MODEL_PATH,
-        "RandomForestRegressor",
-    )
-
+def predict_random_forest(db: Session, source: str):
+    return predict(db,source,"RandomForestRegressor")
 
