@@ -1,127 +1,160 @@
 import pytest
 import requests
-
-from app.scrapers.tgju import get_silver_price as get_tgju_price
-from app.scrapers.silfam import get_silver_price as get_silfam_price
-from app.scrapers.noghresea import get_silver_price as get_noghresea_price
-from app.scrapers.tgju import TGJUScraperError
-from app.scrapers.silfam import SilfamScraperError
-from app.scrapers.noghresea import NoghrehSeaScraperError
+from unittest.mock import Mock
+from app.scrapers import noghresea
+from app.scrapers import silfam
+from app.scrapers import tgju
 
 
-
-class FakeResponse:
-    def __init__(self, json_data=None, text=""):
-        self.json_data = json_data
-        self.text = text
-
-    def raise_for_status(self):
-        pass
-
-    def json(self):
-        return self.json_data
-
-
-
-def test_tgju_scraper(monkeypatch):
-    response = FakeResponse(
-        json_data={
-            "current": {
-                "silver_999": {
-                    "p": "4,074,300",
-                    "ts": "2026-08-30 21:00:00",
-                }
-            }
-        }
-    )
-
-    monkeypatch.setattr(
-        "app.scrapers.tgju.requests.get",
-        lambda *args, **kwargs: response,
-    )
-
-    result = get_tgju_price()
-
-    assert result == {
-        "source": "tgju",
-        "price": "4,074,300",
-        "fetched_at": "2026-08-30 21:00:00",
-        "currency": "IRR",
-    }
-
-
-def test_silfam_scraper(monkeypatch):
-    html = """
-    <span class="silver-value">440,000</span>
-    <div class="silver-last-update">
-        2026-08-30 21:00:00
-    </div>
+def test_noghresea_success(monkeypatch):
+    response = Mock()
+    response.text = """
+        <span class="text-gray-900 text-subtitle2Bold sm:text-subtitle3Bold">
+            120,000 تومان
+        </span>
+        <span class="text-caption1Medium text-gray-500 mb-4 sm:hidden">
+            ۵ شهریور ۱۴۰۵ ساعت ۱۲:۳۰:۴۵
+        </span>
     """
 
-    response = FakeResponse(text=html)
+    monkeypatch.setattr(noghresea.requests, "get", Mock(return_value=response))
 
-    monkeypatch.setattr(
-        "app.scrapers.silfam.requests.get",
-        lambda *args, **kwargs: response,
-    )
+    response.raise_for_status.return_value = None
 
-    result = get_silfam_price()
-
-    assert result["source"] == "silfam"
-    assert result["price"] == "440,000"
-    assert result["fetched_at"] == "2026-08-30 21:00:00"
-    assert result["currency"] == "IRT"
-
-
-def test_noghresea_scraper(monkeypatch):
-    html = """
-    <span class="text-gray-900 text-subtitle2Bold
-    sm:text-subtitle3Bold">450,000</span>
-
-    <span class="text-caption1Medium text-gray-500 mb-4 sm:hidden">
-        2026-08-30 21:00:00
-    </span>
-    """
-
-    response = FakeResponse(text=html)
-
-    monkeypatch.setattr(
-        "app.scrapers.noghresea.requests.get",
-        lambda *args, **kwargs: response,
-    )
-
-    result = get_noghresea_price()
+    result = noghresea.get_silver_price()
 
     assert result["source"] == "noghresea"
-    assert result["price"] == "450,000"
-    assert result["fetched_at"] == "2026-08-30 21:00:00"
+    assert result["price"] == "120,000 تومان"
+    assert result["fetched_at"] == "۵ شهریور ۱۴۰۵ ساعت ۱۲:۳۰:۴۵"
     assert result["currency"] == "IRT"
 
 
-@pytest.mark.parametrize(
-    "module, error_class",
-    [
-        ("tgju", TGJUScraperError),
-        ("silfam", SilfamScraperError),
-        ("noghresea", NoghrehSeaScraperError),
-    ],
-)
-def test_scrapers_handle_request_error(monkeypatch,module,error_class):
-    def failed_request(*args, **kwargs):
-        raise requests.RequestException(
-            "Connection failed"
-        )
-
-    monkeypatch.setattr(
-        f"app.scrapers.{module}.requests.get",
-        failed_request,
+def test_noghresea_request_error(monkeypatch):
+    request_mock = Mock(
+        side_effect=requests.RequestException("Connection failed")
     )
 
-    scraper = {
-        "tgju": get_tgju_price,
-        "silfam": get_silfam_price,
-        "noghresea": get_noghresea_price,
-    }[module]
+    monkeypatch.setattr(noghresea.requests, "get", request_mock)
 
-    with pytest.raises(error_class):
-        scraper()
+    with pytest.raises(noghresea.NoghrehSeaScraperError):
+        noghresea.get_silver_price()
+
+
+def test_noghresea_missing_price(monkeypatch):
+    response = Mock()
+    response.text = """
+        <span class="text-caption1Medium text-gray-500 mb-4 sm:hidden">
+            ۵ شهریور ۱۴۰۵ ساعت ۱۲:۳۰:۴۵
+        </span>
+    """
+
+    response.raise_for_status.return_value = None
+
+    monkeypatch.setattr(noghresea.requests, "get", Mock(return_value=response))
+
+    with pytest.raises(noghresea.NoghrehSeaScraperError):
+        noghresea.get_silver_price()
+
+
+
+def test_silfam_success(monkeypatch):
+    response = Mock()
+    response.text = """
+        <span class="silver-value">
+            120,000 تومان
+        </span>
+        <div class="silver-last-update">
+            آخرین به‌روزرسانی: ۵ شهریور ۱۴۰۵ ساعت ۱۲:۳۰
+        </div>
+    """
+
+    response.raise_for_status.return_value = None
+
+    monkeypatch.setattr(silfam.requests, "get", Mock(return_value=response))
+
+    result = silfam.get_silver_price()
+
+    assert result["source"] == "silfam"
+    assert result["price"] == "120,000 تومان"
+    assert result["fetched_at"] == "آخرین به‌روزرسانی: ۵ شهریور ۱۴۰۵ ساعت ۱۲:۳۰"
+    assert result["currency"] == "IRT"
+
+
+def test_silfam_request_error(monkeypatch):
+    request_mock = Mock(
+        side_effect=requests.RequestException("Connection failed")
+    )
+
+    monkeypatch.setattr(silfam.requests, "get", request_mock)
+
+    with pytest.raises(silfam.SilfamScraperError):
+        silfam.get_silver_price()
+
+
+
+def test_silfam_missing_price(monkeypatch):
+    response = Mock()
+    response.text = """
+        <div class="silver-last-update">
+            آخرین به‌روزرسانی: ۵ شهریور ۱۴۰۵ ساعت ۱۲:۳۰
+        </div>
+    """
+
+    response.raise_for_status.return_value = None
+
+    monkeypatch.setattr(silfam.requests, "get", Mock(return_value=response))
+
+    with pytest.raises(silfam.SilfamScraperError):
+        silfam.get_silver_price()
+
+
+def test_tgju_success(monkeypatch):
+    response = Mock()
+
+    response.json.return_value = {
+        "current": {
+            "silver_999": {
+                "p": "1,200,000",
+                "ts": "2026-09-05 12:30:45",
+            }
+        }
+    }
+
+    response.raise_for_status.return_value = None
+
+    monkeypatch.setattr(tgju.random, "choice", Mock(return_value="call2"))
+    monkeypatch.setattr(tgju, "_generate_rev", Mock(return_value="test-rev"))
+    monkeypatch.setattr(tgju.requests, "get", Mock(return_value=response))
+
+    result = tgju.get_silver_price()
+
+    assert result["source"] == "tgju"
+    assert result["price"] == "1,200,000"
+    assert result["fetched_at"] == "2026-09-05 12:30:45"
+    assert result["currency"] == "IRR"
+
+
+def test_tgju_request_error(monkeypatch):
+    request_mock = Mock(
+        side_effect=requests.RequestException("Connection failed")
+    )
+
+    monkeypatch.setattr(tgju.requests, "get", request_mock)
+
+    with pytest.raises(tgju.TGJUScraperError):
+        tgju.get_silver_price()
+
+
+def test_tgju_invalid_response(monkeypatch):
+    response = Mock()
+
+    response.json.return_value = {
+        "current": {}
+    }
+
+    response.raise_for_status.return_value = None
+
+    monkeypatch.setattr(tgju.requests, "get", Mock(return_value=response))
+
+    with pytest.raises(tgju.TGJUScraperError):
+        tgju.get_silver_price()

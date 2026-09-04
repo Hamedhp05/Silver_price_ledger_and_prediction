@@ -1,16 +1,13 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException
-from app.collectors.price_collector import collect_prices
 from app.models.user import UserModel
 from app.auth.jwt_auth import get_admin_user
+from fastapi import APIRouter, Depends, HTTPException
+from app.collectors.price_collector import collect_prices
 
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(
-    prefix="/collector",
-    tags=["Collector"],
-)
+router = APIRouter(prefix="/collector",tags=["Collector"])
 
 
 @router.post("/run")
