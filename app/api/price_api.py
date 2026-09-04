@@ -20,13 +20,8 @@ router = APIRouter(
 )
 
 
-@router.get(
-    "/latest",
-    response_model=dict[str, LatestPriceResponseSchema | None],
-)
-def latest_prices(
-    db: Session = Depends(get_db),
-):
+@router.get("/latest",response_model=dict[str, LatestPriceResponseSchema | None])
+def latest_prices(db: Session = Depends(get_db),):
     try:
         return get_latest_prices(db)
 
@@ -39,14 +34,8 @@ def latest_prices(
         ) from exc
 
 
-@router.get(
-    "/history",
-    response_model=list[HistoricalDataResponseSchema],
-)
-def historical_price(
-    request: HistoricalRequestSchema = Depends(),
-    db: Session = Depends(get_db),
-):
+@router.get("/history",response_model=list[HistoricalDataResponseSchema],)
+def historical_price(request: HistoricalRequestSchema = Depends(),db: Session = Depends(get_db),):
     try:
         return get_price_history(
             db=db,
@@ -65,14 +54,8 @@ def historical_price(
         ) from exc
 
 
-@router.get(
-    "/chart",
-    response_model=list[ChartResponseSchema],
-)
-def chart_price_and_time(
-    request: ChartRequestSchema = Depends(),
-    db: Session = Depends(get_db),
-):
+@router.get("/chart",response_model=list[ChartResponseSchema],)
+def chart_price_and_time(request: ChartRequestSchema = Depends(),db: Session = Depends(get_db),):
     try:
         return get_chart_data(
             db=db,

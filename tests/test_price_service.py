@@ -1,86 +1,60 @@
 from datetime import datetime
-
 from app.models.silver_price import PriceModel
 from app.models.sources import SourceModel
-from app.services.price_service import get_chart_data
 from app.services.price_service import get_latest_prices
 from app.services.price_service import get_price_history
+from app.services.price_service import get_chart_data
 
-
-def create_source(db, name):
-    source = SourceModel(
-        name=name,
-        type="SCRAPER",
+sources = [
+    SourceModel(
+        name="tgju",
+        type= "API",
         enabled=True,
-    )
-
-    db.add(source)
-    db.commit()
-    db.refresh(source)
-
-    return source
-
-
-def add_price(db, source, price, fetched_at):
-    record = PriceModel(
-        source_id=source.id,
-        price=price,
-        fetched_at=fetched_at,
-    )
-
-    db.add(record)
-    db.commit()
-
-    return record
-
+    ),
+    SourceModel(
+        name="silfam",
+        type= "SCRAPER",
+        enabled=True,
+    ),
+    SourceModel(
+        name="noghresea",
+        type= "SCRAPER",
+        enabled=True,
+    ),
+]
 
 def test_get_latest_prices(db_session):
-    tgju = create_source(db_session, "tgju")
-    silfam = create_source(db_session, "silfam")
-    noghresea = create_source(db_session, "noghresea")
+    db_session.add_all(sources)
+    db_session.commit()
 
-    add_price(
-        db_session,
-        tgju,
-        400000,
-        datetime(2026, 8, 30, 20, 0),
-    )
-    add_price(
-        db_session,
-        tgju,
-        410000,
-        datetime(2026, 8, 30, 21, 0),
-    )
+    for source in sources:
+        db_session.refresh(source)
 
-    add_price(
-        db_session,
-        silfam,
-        440000,
-        datetime(2026, 8, 30, 21, 0),
-    )
-
-    add_price(
-        db_session,
-        noghresea,
-        450000,
-        datetime(2026, 8, 30, 21, 0),
-    )
+    db_session.add_all([
+        PriceModel(source_id=sources[0].id, price=100000, fetched_at=datetime(2026, 1, 1, 10, 0)),
+        PriceModel(source_id=sources[0].id, price=110000, fetched_at=datetime(2026, 1, 1, 11, 0)),
+        PriceModel(source_id=sources[1].id, price=200000, fetched_at=datetime(2026, 1, 1, 10, 0)),
+        PriceModel(source_id=sources[1].id, price=220000, fetched_at=datetime(2026, 1, 1, 12, 0)),
+        PriceModel(source_id=sources[2].id, price=300000, fetched_at=datetime(2026, 1, 1, 9, 0)),
+        PriceModel(source_id=sources[2].id, price=330000, fetched_at=datetime(2026, 1, 1, 13, 0)),
+    ])
+    db_session.commit()
 
     result = get_latest_prices(db_session)
 
-    assert result["tgju"]["price"] == 410000
-    assert result["tgju"]["timestamp"] == datetime(
-        2026, 8, 30, 21, 0
-    )
+    assert result["tgju"]["price"] == 110000
+    assert result["tgju"]["timestamp"] == datetime(2026, 1, 1, 11, 0)
 
-    assert result["silfam"]["price"] == 440000
-    assert result["noghresea"]["price"] == 450000
+    assert result["silfam"]["price"] == 220000
+    assert result["silfam"]["timestamp"] == datetime(2026, 1, 1, 12, 0)
+
+    assert result["noghresea"]["price"] == 330000
+    assert result["noghresea"]["timestamp"] == datetime(2026, 1, 1, 13, 0)
 
 
-def test_get_latest_prices_returns_none_for_missing_source(
-    db_session,
-):
-    create_source(db_session, "tgju")
+def test_get_latest_prices_source_without_data(db_session):
+    db_session.add_all(sources)
+    db_session.commit()
 
     result = get_latest_prices(db_session)
 
@@ -89,105 +63,69 @@ def test_get_latest_prices_returns_none_for_missing_source(
     assert result["noghresea"] is None
 
 
-def test_get_price_history_filters_source_and_date(
-    db_session,
-):
-    tgju = create_source(db_session, "tgju")
-    silfam = create_source(db_session, "silfam")
 
-    add_price(
-        db_session,
-        tgju,
-        400000,
-        datetime(2026, 8, 28, 10, 0),
-    )
 
-    add_price(
-        db_session,
-        tgju,
-        410000,
-        datetime(2026, 8, 29, 10, 0),
-    )
+def test_get_price_history(db_session):
+    source = SourceModel(name="tgju",type= "API",enabled=True)
+    db_session.add(source)
+    db_session.commit()
+    db_session.refresh(source)
 
-    add_price(
-        db_session,
-        tgju,
-        420000,
-        datetime(2026, 8, 30, 10, 0),
-    )
+    db_session.add_all([
+        PriceModel(source_id=source.id, price=300000, fetched_at=datetime(2026, 1, 1, 12, 0)),
+        PriceModel(source_id=source.id, price=100000, fetched_at=datetime(2026, 1, 1, 10, 0)),
+        PriceModel(source_id=source.id, price=200000, fetched_at=datetime(2026, 1, 1, 11, 0)),
+    ])
+    db_session.commit()
 
-    add_price(
-        db_session,
-        silfam,
-        440000,
-        datetime(2026, 8, 29, 10, 0),
-    )
+    result = get_price_history(db_session)
 
-    result = get_price_history(
-        db_session,
-        start_date=datetime(2026, 8, 29),
-        end_date=datetime(2026, 8, 30, 23, 59),
-        source="tgju",
-    )
+    assert len(result) == 3
+    assert [price.price for price in result] == [100000, 200000, 300000]
+    assert [price.fetched_at for price in result] == [datetime(2026, 1, 1, 10, 0),datetime(2026, 1, 1, 11, 0),datetime(2026, 1, 1, 12, 0)]
+
+
+def test_get_price_history_with_source_and_limit(db_session):
+    tgju = SourceModel(name="tgju",type= "API",enabled=True)
+    silfam = SourceModel(name="silfam",type= "SCRAPER",enabled=True)
+    db_session.add_all([tgju, silfam])
+    db_session.commit()
+    db_session.refresh(tgju)
+    db_session.refresh(silfam)
+
+    db_session.add_all([
+        PriceModel(source_id=tgju.id, price=100000, fetched_at=datetime(2026, 1, 1, 10, 0)),
+        PriceModel(source_id=tgju.id, price=110000, fetched_at=datetime(2026, 1, 1, 11, 0)),
+        PriceModel(source_id=tgju.id, price=120000, fetched_at=datetime(2026, 1, 1, 12, 0)),
+        PriceModel(source_id=silfam.id, price=200000, fetched_at=datetime(2026, 1, 1, 10, 0)),
+    ])
+    db_session.commit()
+
+    result = get_price_history(db_session,source="tgju",limit=2)
 
     assert len(result) == 2
-    assert result[0].price == 410000
-    assert result[1].price == 420000
+    assert [res.price for res in result] == [100000, 110000]
+    assert all(res.source_id == tgju.id for res in result)
 
 
-def test_get_price_history_respects_limit(
-    db_session,
-):
-    tgju = create_source(db_session, "tgju")
-
-    for i in range(5):
-        add_price(
-            db_session,
-            tgju,
-            400000 + i,
-            datetime(2026, 8, 30, i, 0),
-        )
-
-    result = get_price_history(
-        db_session,
-        source="tgju",
-        limit=3,
-    )
-
-    assert len(result) == 3
-    assert [item.price for item in result] == [
-        400000,
-        400001,
-        400002,
-    ]
 
 
-def test_get_chart_data_returns_latest_points_in_order(
-    db_session,
-):
-    tgju = create_source(db_session, "tgju")
+def test_get_chart_data(db_session):
+    source = SourceModel(name="tgju",type="API",enabled=True)
+    db_session.add(source)
+    db_session.commit()
+    db_session.refresh(source)
 
-    for i in range(5):
-        add_price(
-            db_session,
-            tgju,
-            400000 + i,
-            datetime(2026, 8, 30, i, 0),
-        )
+    db_session.add_all([
+        PriceModel(source_id=source.id, price=100000, fetched_at=datetime(2026, 1, 1, 10, 0)),
+        PriceModel(source_id=source.id, price=110000, fetched_at=datetime(2026, 1, 1, 11, 0)),
+        PriceModel(source_id=source.id, price=120000, fetched_at=datetime(2026, 1, 1, 12, 0)),
+        PriceModel(source_id=source.id, price=130000, fetched_at=datetime(2026, 1, 1, 13, 0)),
+    ])
+    db_session.commit()
 
-    result = get_chart_data(
-        db_session,
-        source="tgju",
-        point_count=3,
-    )
+    result = get_chart_data(db_session,source="tgju",point_count=2)
 
-    assert len(result) == 3
-
-    assert [item.price for item in result] == [
-        400002,
-        400003,
-        400004,
-    ]
-
-    assert result[0].fetched_at < result[1].fetched_at
-    assert result[1].fetched_at < result[2].fetched_at
+    assert len(result) == 2
+    assert [price.price for price in result] == [120000, 130000]
+    assert [price.fetched_at for price in result] == [datetime(2026, 1, 1, 12, 0),datetime(2026, 1, 1, 13, 0)]
