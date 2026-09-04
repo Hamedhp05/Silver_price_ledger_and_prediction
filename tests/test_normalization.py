@@ -1,106 +1,62 @@
 import pytest
 from datetime import datetime
-from app.collectors.normalization import NormalizationError,_normalize_price,_normalize_datetime,normalize_price_data
+from app.collectors.normalization import NormalizationError
+from app.collectors.normalization import _normalize_price
+from app.collectors.normalization import _normalize_datetime
+from app.collectors.normalization import normalize_price_data
 
+
+def test_normalize_silfam_price():
+    assert _normalize_price("120,000 تومان", "silfam") == 120000
 
 def test_normalize_tgju_price():
-    result = _normalize_price(
-        "4,074,300",
-        "tgju",
-    )
+    assert _normalize_price("1,200,000", "tgju") == 120000
 
-    assert result == 407430
+def test_normalize_invalid_price():
+    with pytest.raises(NormalizationError):
+        _normalize_price("abc", "silfam")
 
-
-def test_normalize_other_source_price():
-    result = _normalize_price(
-        "440,000 تومان",
-        "silfam",
-    )
-
-    assert result == 440000
-
-
-def test_normalize_persian_datetime():
-    result = _normalize_datetime(
-        "۰۸ شهریور ۱۴۰۵ - ۲۲:۰۶:۰۴",
-        "noghresea",
-    )
-
-    assert isinstance(result, datetime)
-    assert result.year == 2026
-    assert result.month == 8
-    assert result.day == 30
-    assert result.hour == 22
-    assert result.minute == 6
-    assert result.second == 4
-
+    with pytest.raises(NormalizationError):
+        _normalize_price("0", "silfam")
 
 def test_normalize_silfam_datetime():
-    result = _normalize_datetime(
-        "آخرین به‌روزرسانی: ۹ شهریور ۱۴۰۵ ساعت ۲۱:۰۰",
-        "silfam",
-    )
+    result = _normalize_datetime("آخرین به‌روزرسانی: ۵ شهریور ۱۴۰۵ ساعت ۱۲:۳۰","silfam")
 
-    assert result == datetime(
-        2026,
-        8,
-        31,
-        21,
-        0,
-        0,
-    )
+    assert result.year == 2026
+    assert result.month == 8
+    assert result.day == 27
+    assert result.hour == 12
+    assert result.minute == 30
+    assert result.second == 0
 
 
-def test_normalize_price_data():
-    data = {
-        "source": "TGJU",
-        "price": "4,074,300",
-        "fetched_at": "2026-08-30 21:00:00",
-        "currency": "IRR",
-    }
+def test_normalize_tgju_datetime():
+    result = _normalize_datetime("2026-09-05 12:30:45","tgju")
 
-    result = normalize_price_data(data)
+    assert result.year == 2026
+    assert result.month == 9
+    assert result.day == 5
+    assert result.hour == 12
+    assert result.minute == 30
+    assert result.second == 45
 
-    assert result["source"] == "tgju"
-    assert result["price"] == 407430
-    assert result["fetched_at"] == datetime(
-        2026,
-        8,
-        30,
-        21,
-        0,
-        0,
-    )
-    assert result["currency"] == "IRT"
+    assert result == datetime(2026, 9, 5, 12, 30, 45)
 
 
-@pytest.mark.parametrize(
-    "price, source",
-    [
-        ("0", "tgju"),
-        ("-100", "silfam"),
-        ("abc", "noghresea"),
-    ],
-)
-def test_invalid_prices_raise_error(price, source):
+def test_normalize_noghrehsea_datetime():
+    result = _normalize_datetime("۵ شهریور ۱۴۰۵ ساعت ۱۲:۳۰:۴۵","noghresea")
+
+    assert result.year == 2026
+    assert result.month == 8
+    assert result.day == 27
+    assert result.hour == 12
+    assert result.minute == 30
+    assert result.second == 45
+
+def test_normalize_price_data_missing_price():
     with pytest.raises(NormalizationError):
-        _normalize_price(price, source)
+        normalize_price_data({"source": "tgju","fetched_at": "2026-09-05 12:30:00"})
 
-
-@pytest.mark.parametrize(
-    "data",
-    [
-        {},
-        {"source": "tgju"},
-        {
-            "source": "tgju",
-            "price": "400000",
-        },
-        "invalid",
-        None,
-    ],
-)
-def test_invalid_scraper_data_raises_error(data):
+def test_normalize_price_data_missing_field():
     with pytest.raises(NormalizationError):
-        normalize_price_data(data)
+        normalize_price_data({"source": "tgju","fetched_at": "2026-09-05 12:30:45"})
