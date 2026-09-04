@@ -7,6 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.database.base import Base
 from app.database.session import get_db
+from app.models import SourceModel,PredictionModel,PriceModel,UserModel
 
 
 load_dotenv(".env.test")
@@ -47,3 +48,11 @@ def override_dependencies(db_session):
 def anon_client():
     client = TestClient(app)
     yield client
+
+@pytest.fixture(scope="function", autouse=True)
+def clean_database(db_session):
+    yield
+    db_session.query(PredictionModel).delete()
+    db_session.query(PriceModel).delete()
+    db_session.query(SourceModel).delete()
+    db_session.commit()
