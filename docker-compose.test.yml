@@ -2,10 +2,8 @@ services:
   test_db:
     image: postgres:15-alpine
     container_name: silver_test_db
-    environment:
-      POSTGRES_DB: silver_test
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+    env_file:
+      - .env.test
     ports:
       - "5436:5432"
     volumes:
