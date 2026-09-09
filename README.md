@@ -1,48 +1,181 @@
-Silver Price Ledger System
+# Silver Price Ledger System
 
-Requirements
+## Requirements
 
-Before running the project, make sure the following are installed:
+Before running the project, make sure the following software is installed:
 
-- Python 3.11+
-- Docker
-- Docker Compose
+* Python 3.11 or higher
+* Git
+* Docker Desktop
+* Docker Compose
 
-1. Clone the Project
+---
 
-git clone <repository-url>
-cd Silver-Price-Ledger
+## 1. Install Python
 
-2. Create Virtual Environment
+Python 3.11 or higher is required to run this project.
+
+Download Python from the official Python website:
+
+[Download Python](https://www.python.org/downloads/?utm_source=chatgpt.com)
+
+For Windows, download the latest Python 3.11+ installer.
+
+During installation, **make sure the following option is enabled**:
+
+```text
+Add Python.exe to PATH
+```
+
+Then continue with the installation.
+
+After installation, open a new **Command Prompt** or **PowerShell** window and check the installation:
+
+```powershell
+python --version
+```
+
+The output should be similar to:
+
+```text
+Python 3.11.x
+```
+
+If the `python` command is not recognized, restart the terminal and check again. If the problem remains, make sure Python was added to the system PATH.
+
+---
+
+## 2. Install Git
+
+Git is required to download the project from GitHub.
+
+Download Git for Windows from the official website:
+
+[Download Git for Windows](https://git-scm.com/install/windows?utm_source=chatgpt.com)
+
+After opening the installer, you can use the default installation options. For a normal installation, there is usually no need to change the default settings.
+
+After installation, open a **new** Command Prompt or PowerShell window and check that Git is installed correctly:
+
+```powershell
+git --version
+```
+
+The output should be similar to:
+
+```text
+git version 2.x.x
+```
+
+If the `git` command is not recognized, close and reopen the terminal. If the problem continues, restart Windows and try again.
+
+---
+
+## 3. Install Docker Desktop
+
+Docker Desktop is required to run the PostgreSQL databases used by the project.
+
+Download Docker Desktop from the official website:
+
+[Download Docker Desktop](https://www.docker.com/products/docker-desktop/?utm_source=chatgpt.com)
+
+Download the Windows version and complete the installation using the default options.
+
+After installation, **open Docker Desktop and make sure it is running** before continuing.
+
+To verify Docker installation, open a new PowerShell or Command Prompt window and run:
+
+```powershell
+docker --version
+```
+
+Then check Docker Compose:
+
+```powershell
+docker compose version
+```
+
+Both commands should display their installed versions.
+
+> Docker Desktop must be running whenever you want to start the PostgreSQL containers.
+
+---
+
+## 4. Clone the Project
+
+Git is used to download the project from GitHub.
+
+Open **PowerShell** or **Command Prompt** and navigate to the folder where you want to store the project.
+
+Then run:
+
+```powershell
+git clone https://github.com/Hamedhp05/Silver_price_ledger_and_prediction.git
+```
+
+After the download is complete, enter the project directory:
+
+```powershell
+cd Silver_price_ledger_and_prediction
+```
+
+All remaining commands in this README should be executed from the project root directory unless stated otherwise.
+
+---
+
+## 5. Create Virtual Environment
+
+A virtual environment keeps the Python packages of this project separate from other Python projects on the computer.
 
 Create a virtual environment:
 
+```powershell
 python -m venv .venv
+```
 
 Activate it on Windows:
 
+```powershell
 .venv\Scripts\activate
+```
 
-3. Install Dependencies
+After successful activation, `(.venv)` should appear at the beginning of the terminal prompt.
 
-Install the required packages:
+For example:
 
+```text
+(.venv) PS C:\...\Silver_price_ledger_and_prediction>
+```
+
+---
+
+## 6. Install Dependencies
+
+With the virtual environment activated, install all required Python packages:
+
+```powershell
 pip install -r requirements.txt
+```
 
-4. Configure Environment Variables
+Wait until the installation finishes successfully before continuing.
+
+---
+
+## 7. Configure Environment Variables
 
 The project uses environment variables for database and authentication configuration.
 
-First, create a ".env" file in the project root by copying ".env.example".
+Create a `.env` file in the project root by copying `.env.example`:
 
-On Windows:
-
+```powershell
 copy .env.example .env
+```
 
-Then open the ".env" file and check or modify the values if necessary.
+Then open the `.env` file and check or modify the values if necessary.
 
 Example:
 
+```env
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
 POSTGRES_DB=silver_price_db
@@ -51,71 +184,179 @@ SQLALCHEMY_DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5435/s
 
 JWT_SECRET_KEY=your_secret_key
 JWT_ACCESS_TOKEN_EXPIRE_MINUTES=60
+```
 
-The ".env" file must not be committed to Git.
+The `.env` file contains configuration values and must not be committed to Git.
 
-5. Start PostgreSQL
+---
 
-Start the PostgreSQL container:
+## 8. Start PostgreSQL
 
+The project uses PostgreSQL as its database.
+
+Make sure **Docker Desktop is running**, then start the PostgreSQL container:
+
+```powershell
 docker compose up -d
+```
 
-Make sure the PostgreSQL container is running before continuing.
+To check that the container is running:
 
-6. Run Database Migrations
+```powershell
+docker ps
+```
 
-Apply the database migrations:
+The PostgreSQL container should appear in the list of running containers.
 
+---
+
+## 9. Run Database Migrations
+
+After starting PostgreSQL, apply the database migrations:
+
+```powershell
 alembic upgrade head
+```
 
-7. Run the Application
+This creates and updates the required database tables according to the project's migration files.
 
-Start the FastAPI application:
+---
 
+## 10. Run the Application
+
+Make sure the virtual environment is activated, then start the FastAPI application:
+
+```powershell
 uvicorn app.main:app --reload
-
-Alternatively:
-
-fastapi dev
+```
 
 The application will be available at:
 
 http://127.0.0.1:8000
 
-Swagger API documentation:
+Swagger API documentation is available at:
 
 http://127.0.0.1:8000/docs
 
-8. Train Prediction Models
+> Keep this terminal running while using the application.
 
-Before using the prediction endpoint, the machine learning models must be trained and generated.
+---
 
-Run the project's model training process using the training method defined in the project.
+## 11. Prediction Models
 
-After successful training, the model files will be stored in:
+Pre-trained machine learning models are already included in the project in the following directory:
 
+```text
 ml_models/
+```
 
-9. Run Tests
+Therefore, it is not necessary to train the models before the first run of the project.
 
-Tests use a separate PostgreSQL database.
+The existing model files can be used directly by the prediction functionality.
 
-First, create ".env.test" by copying ".env.test.example".
+### Retraining the Models
 
-On Windows:
+If you want to train the models again using the latest data stored in the database, you can run the training process manually.
 
+Open:
+
+```text
+app/prediction/training.py
+```
+
+At the bottom of the file, the following code is currently commented:
+
+```python
+# from app.database.session import SessionLocal
+# db = SessionLocal()
+# train_models(db)
+```
+
+Remove the comments from these lines:
+
+```python
+from app.database.session import SessionLocal
+
+db = SessionLocal()
+train_models(db)
+```
+
+Then, from the root directory of the project, run:
+
+```powershell
+python -m app.prediction.training
+```
+
+The training process will use the data available in the database and generate the trained model files again inside:
+
+```text
+ml_models/
+```
+
+After successful training, the newly generated model files will be used by the prediction functionality.
+
+> The PostgreSQL database must be running and contain sufficient data before starting the training process.
+
+---
+
+## 12. Run Tests
+
+The project uses a **separate PostgreSQL database for testing** so that running tests does not affect the main application database.
+
+The test database is defined in:
+
+```text
+docker-compose.test.yml
+```
+
+### Start the Test Database
+
+First, make sure Docker Desktop is running.
+
+Then start the test PostgreSQL container:
+
+```powershell
+docker compose -f docker-compose.test.yml up -d
+```
+
+Check that the test database container is running:
+
+```powershell
+docker ps
+```
+
+After the test database is running, create the test environment file:
+
+```powershell
 copy .env.test.example .env.test
+```
 
-Then run the automated tests:
+Then run the tests:
 
+```powershell
 pytest
+```
 
-Or run them with more detailed output:
+For more detailed output:
 
+```powershell
 pytest -v
+```
 
-10. Stop PostgreSQL
+### Stop the Test Database
 
-When the application is no longer needed, the PostgreSQL container can be stopped with:
+After finishing the tests, the test PostgreSQL container can be stopped with:
 
+```powershell
+docker compose -f docker-compose.test.yml down
+```
+
+---
+
+## 13. Stop PostgreSQL
+
+When the application is no longer needed, stop the main PostgreSQL container:
+
+```powershell
 docker compose down
+```
