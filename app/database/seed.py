@@ -40,7 +40,7 @@ def seed_sources():
 
             if existing_source is None:
                 db.add(source)
-                # logger.info("Source '%s' added.",source.name)
+                logger.info("Source '%s' added.",source.name)
 
         db.commit()
 

@@ -241,8 +241,78 @@ http://127.0.0.1:8000/docs
 > Keep this terminal running while using the application.
 
 ---
+## 11. Authentication and Admin Access
 
-## 11. Prediction Models
+The project uses JWT-based authentication.
+
+When the application starts for the first time, the required price sources and a default administrator account are automatically created in the database.
+
+### Default Administrator Account
+
+The default administrator account is:
+
+```text
+Username: admin
+Password: 123456
+```
+
+> **Important:** This is the default password provided for initial access. For a real production environment, the password should be changed to a secure password.
+
+### Login and Access Token
+
+To access protected endpoints, you must first log in to the application using the administrator account.
+
+You can perform the login through the Swagger API documentation:
+
+http://127.0.0.1:8000/docs
+
+Find the login endpoint and enter:
+
+```text
+Username: admin
+Password: 123456
+```
+
+After a successful login, the API returns an **access token**.
+
+This access token is used to authenticate requests to protected endpoints.
+
+In Swagger, click the **Authorize** button and enter the access token according to the authentication format requested by the API.
+
+After authorization, Swagger will automatically include the access token in requests to protected endpoints.
+
+### Admin-Only Price Collection
+
+The project includes an endpoint for manually starting the price collection process:
+
+```text
+POST /collector/run
+```
+
+This endpoint is restricted to administrators and cannot be accessed by regular users.
+
+To run it:
+
+1. Log in using the administrator account.
+2. Copy the access token returned by the login endpoint.
+3. Click **Authorize** in Swagger.
+4. Enter the access token.
+5. Open the `POST /collector/run` endpoint.
+6. Click **Execute**.
+
+If the operation is successful, the API returns:
+
+```json
+{
+    "message": "Price collection completed successfully."
+}
+```
+
+The endpoint collects the latest silver prices from the configured data sources.
+
+> **Important:** Authentication is required before accessing protected endpoints. Regular users do not have administrator permissions and cannot execute the price collection endpoint.
+
+## 12. Prediction Models
 
 Pre-trained machine learning models are already included in the project in the following directory:
 
@@ -299,7 +369,7 @@ After successful training, the newly generated model files will be used by the p
 
 ---
 
-## 12. Run Tests
+## 13. Run Tests
 
 The project uses a **separate PostgreSQL database for testing** so that running tests does not affect the main application database.
 
@@ -353,7 +423,7 @@ docker compose -f docker-compose.test.yml down
 
 ---
 
-## 13. Stop PostgreSQL
+## 14. Stop PostgreSQL
 
 When the application is no longer needed, stop the main PostgreSQL container:
 
